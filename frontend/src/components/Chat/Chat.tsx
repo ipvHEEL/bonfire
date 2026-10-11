@@ -6,26 +6,73 @@ type Message = {
     message_id: number
     text: string
     user_name: string
+    created_at: string
 }
 
 const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+const DIALOG_ID = 1
+const USER_NAME_KEY = 'bonfire:user_name'
+
+function loadUserName() {
+    try {
+        const saved = localStorage.getItem(USER_NAME_KEY)
+        if (saved) return saved
+    } catch {
+        // localStorage может быть недоступен (приватный режим)
+    }
+
+    const name = `user${Math.floor(Math.random() * 1000)}`
+    try {
+        localStorage.setItem(USER_NAME_KEY, name)
+    } catch {
+        // имя просто не сохранится между перезагрузками
+    }
+    return name
+}
+
+// История и новые сообщения из сокета могут прийти в любом порядке,
+// поэтому объединяем по message_id без дублей и сортируем
+function mergeMessages(current: Message[], incoming: Message[]) {
+    const byId = new Map(current.map((m) => [m.message_id, m]))
+    for (const message of incoming) byId.set(message.message_id, message)
+    return [...byId.values()].sort((a, b) => a.message_id - b.message_id)
+}
+
+function formatTime(iso: string) {
+    return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
 
 export function Chat() {
     const [messages, setMessages] = useState<Message[]>([])
     const [text, setText] = useState('')
-    const [userName] = useState(() => `user${Math.floor(Math.random() * 1000)}`)
+    const [userName] = useState(loadUserName)
     const ws = useRef<WebSocket | null>(null)
 
     useEffect(() => {
+        const controller = new AbortController()
+
+        fetch(`/api/dialogs/${DIALOG_ID}/messages`, { signal: controller.signal })
+            .then((response) => response.json())
+            .then((data: { messages: Message[] }) => {
+                setMessages((prev) => mergeMessages(prev, data.messages))
+            })
+            .catch((error) => {
+                if (error.name !== 'AbortError') console.error('Не удалось загрузить историю', error)
+            })
+
         const socket = new WebSocket(WS_URL)
         ws.current = socket
 
         socket.onmessage = (event) => {
             const message: Message = JSON.parse(event.data)
-            setMessages((prev) => [...prev, message])
+            if (message.dialog_id !== DIALOG_ID) return
+            setMessages((prev) => mergeMessages(prev, [message]))
         }
 
-        return () => socket.close()
+        return () => {
+            controller.abort()
+            socket.close()
+        }
     }, [])
 
     function handleSend(){
@@ -33,7 +80,7 @@ export function Chat() {
         if (ws.current?.readyState !== WebSocket.OPEN) return;
 
         ws.current.send(JSON.stringify({
-            dialog_id: 1,
+            dialog_id: DIALOG_ID,
             text: text,
             user_name: userName,
         }))
@@ -79,6 +126,9 @@ export function Chat() {
                                     <span className="message__author">{message.user_name}</span>
                                 )}
                                 <span className="message__text">{message.text}</span>
+                                <time className="message__time" dateTime={message.created_at}>
+                                    {formatTime(message.created_at)}
+                                </time>
                             </div>
                         )
                     })}

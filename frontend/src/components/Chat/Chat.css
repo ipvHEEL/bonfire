@@ -78,6 +78,12 @@ html, body, #root {
     color: var(--accent);
 }
 
+.message__time {
+    align-self: flex-end;
+    font-size: 11px;
+    opacity: 0.6;
+}
+
 .message__text {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
