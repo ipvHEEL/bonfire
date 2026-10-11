@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/remote-schema.json",
+  "identifier": "server",
+  "description": "Страницы сервера Bonfire: только уведомления. Какой сервер открыт, решает проверка навигации в lib.rs — на чужие сайты окно не переходит",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://*:*", "https://*"]
+  },
+  "permissions": ["notification:default"]
+}
