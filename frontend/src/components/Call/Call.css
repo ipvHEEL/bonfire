@@ -123,3 +123,54 @@
     font-weight: 600;
     cursor: pointer;
 }
+
+/* Выбор шумоподавления */
+.call__noise {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.call__noise-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.call__noise-options {
+    display: flex;
+    padding: 3px;
+    border-radius: 12px;
+    background-color: var(--bg);
+}
+
+.call__noise-option {
+    flex: 1;
+    padding: 6px 4px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.call__noise-option:hover:not(:disabled) {
+    color: var(--text);
+}
+
+.call__noise-option--on,
+.call__noise-option--on:hover:not(:disabled) {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.call__noise-option:disabled {
+    cursor: default;
+}
+
+.call__noise-option:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Room, RoomEvent, Track, type Participant, type RemoteTrack } from 'livekit-client'
+import { Room, RoomEvent, Track, type LocalAudioTrack, type Participant, type RemoteTrack } from 'livekit-client'
 import { LIVEKIT_URL, type Call } from '../../api'
+import {
+    captureOptions, isEnhancedSupported, loadNoiseMode, NOISE_MODES, NoiseSuppressionProcessor,
+    saveNoiseMode, usesProcessor, type NoiseMode,
+} from './noiseSuppression'
 import './Call.css'
 
 type Props = {
@@ -34,6 +38,36 @@ function PhoneIcon({ down = false }: { down?: boolean }) {
     )
 }
 
+function getMicTrack(room: Room) {
+    return room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined
+}
+
+// Включает нужное шумоподавление на уже работающем микрофоне.
+// Возвращает режим, который в итоге заработал
+async function applyNoiseMode(room: Room, mode: NoiseMode): Promise<NoiseMode> {
+    const track = getMicTrack(room)
+    if (!track) return mode
+
+    if (!usesProcessor(mode)) {
+        await track.stopProcessor()
+        await track.restartTrack(captureOptions(mode))
+        return mode
+    }
+    try {
+        const processor = new NoiseSuppressionProcessor(mode)
+        if (track.getProcessor()?.name !== processor.name) {
+            await track.restartTrack(captureOptions(mode))
+            await track.setProcessor(processor)
+        }
+        return mode
+    } catch {
+        // Без нейросети возвращаем шумоподавление браузера, чтобы не остаться совсем без него
+        await track.stopProcessor().catch(() => {})
+        await track.restartTrack(captureOptions('standard'))
+        return 'standard'
+    }
+}
+
 function MicIcon({ muted }: { muted: boolean }) {
     return (
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -52,6 +86,9 @@ export function CallPanel({ call, title, token, isIncoming, onAccept, onDecline,
     const [speaking, setSpeaking] = useState<{ me: boolean, peer: boolean }>({ me: false, peer: false })
     const [audioBlocked, setAudioBlocked] = useState(false)
     const [now, setNow] = useState(() => Date.now())
+    const [noiseMode, setNoiseMode] = useState<NoiseMode>(loadNoiseMode)
+    const [switchingNoise, setSwitchingNoise] = useState(false)
+    const noiseModeRef = useRef(noiseMode)
     const roomRef = useRef<Room | null>(null)
     // Колбэки могут меняться при каждом рендере, а соединение — нет
     const onErrorRef = useRef(onError)
@@ -106,14 +143,24 @@ export function CallPanel({ call, title, token, isIncoming, onAccept, onDecline,
                 onHangupRef.current()
                 return
             }
+            const mode = noiseModeRef.current
             try {
-                await room.localParticipant.setMicrophoneEnabled(true)
+                await room.localParticipant.setMicrophoneEnabled(true, captureOptions(mode))
             } catch {
                 if (cancelled) return
                 // Без микрофона всё равно можно слушать: остаёмся в звонке
                 // с выключенным звуком, кнопка микрофона попробует ещё раз
                 setMuted(true)
                 onErrorRef.current('Нет доступа к микрофону — вас не слышно. Разрешите его в настройках браузера')
+                return
+            }
+            if (usesProcessor(mode) && !cancelled) {
+                const applied = await applyNoiseMode(room, mode)
+                if (applied !== mode && !cancelled) {
+                    setNoiseMode(applied)
+                    noiseModeRef.current = applied
+                    onErrorRef.current('Нейросетевое шумоподавление не запустилось — работает обычное')
+                }
             }
         }
         connect()
@@ -145,6 +192,29 @@ export function CallPanel({ call, title, token, isIncoming, onAccept, onDecline,
         }
     }
 
+    async function changeNoiseMode(next: NoiseMode) {
+        if (next === noiseMode || switchingNoise) return
+        saveNoiseMode(next)
+        noiseModeRef.current = next
+        const room = roomRef.current
+        if (!room || !getMicTrack(room)) {
+            // Микрофона ещё нет: режим применится, когда он включится
+            setNoiseMode(next)
+            return
+        }
+        setSwitchingNoise(true)
+        try {
+            const applied = await applyNoiseMode(room, next)
+            setNoiseMode(applied)
+            noiseModeRef.current = applied
+            if (applied !== next) onError('Нейросетевое шумоподавление не запустилось — работает обычное')
+        } catch {
+            onError('Не получилось переключить шумоподавление')
+        } finally {
+            setSwitchingNoise(false)
+        }
+    }
+
     let statusText = 'Подключение…'
     if (isIncoming) statusText = 'Входящий звонок'
     else if (call.status === 'ringing') statusText = 'Вызов…'
@@ -162,6 +232,27 @@ export function CallPanel({ call, title, token, isIncoming, onAccept, onDecline,
                 <strong className="call__name">{title}</strong>
                 <span className="call__status" aria-live="polite">{statusText}</span>
             </div>
+
+            {token && isEnhancedSupported && (
+                <div className="call__noise" role="radiogroup" aria-label="Шумоподавление">
+                    <span className="call__noise-label">Шумоподавление</span>
+                    <div className="call__noise-options">
+                        {NOISE_MODES.map(({ mode, label, hint }) => (
+                            <button
+                                key={mode}
+                                role="radio"
+                                aria-checked={noiseMode === mode}
+                                className={'call__noise-option' + (noiseMode === mode ? ' call__noise-option--on' : '')}
+                                onClick={() => changeNoiseMode(mode)}
+                                disabled={switchingNoise}
+                                title={hint}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {audioBlocked && (
                 <button className="call__unblock" onClick={() => roomRef.current?.startAudio()}>
