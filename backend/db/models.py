@@ -138,3 +138,19 @@ class CallParticipant(Base):
     )
     left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+class Invite(Base):
+    """Код приглашения: на открытом сервере регистрация возможна только по нему."""
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True)
+    # Для себя: кому отдан код, например «Петя»
+    note: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+

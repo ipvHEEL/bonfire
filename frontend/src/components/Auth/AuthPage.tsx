@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, type User } from '../../api'
 import './AuthPage.css'
 
@@ -31,6 +31,15 @@ export function AuthPage({ onAuth }: Props) {
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [inviteCode, setInviteCode] = useState('')
+    // На сервере в интернете регистрация только по инвайт-коду
+    const [inviteRequired, setInviteRequired] = useState(false)
+
+    useEffect(() => {
+        api<{ registration: string }>('/auth/config')
+            .then((config) => setInviteRequired(config.registration === 'invite'))
+            .catch(() => {})
+    }, [])
 
     const isRegister = mode === 'register'
 
@@ -42,7 +51,9 @@ export function AuthPage({ onAuth }: Props) {
     async function handleSubmit(event: FormEvent) {
         event.preventDefault()
 
-        const validationError = validate(mode, username.trim(), password)
+        const validationError = isRegister && inviteRequired && !inviteCode.trim()
+            ? 'Введите инвайт-код'
+            : validate(mode, username.trim(), password)
         if (validationError) {
             setError(validationError)
             return
@@ -57,6 +68,7 @@ export function AuthPage({ onAuth }: Props) {
                     username: username.trim(),
                     password,
                     ...(isRegister && { display_name: displayName.trim() || null }),
+                    ...(isRegister && inviteRequired && { invite_code: inviteCode.trim() }),
                 }),
             })
             onAuth(user)
@@ -116,6 +128,22 @@ export function AuthPage({ onAuth }: Props) {
                             <small className="auth__hint">Латиница, цифры и _, от 3 до 32 символов</small>
                         )}
                     </label>
+
+                    {isRegister && inviteRequired && (
+                        <label className="auth__field">
+                            <span>Инвайт-код</span>
+                            <input
+                                className="auth__input auth__input--code"
+                                value={inviteCode}
+                                onChange={(e) => setInviteCode(e.target.value)}
+                                placeholder="XXXX-XXXX-XXXX"
+                                autoComplete="off"
+                                spellCheck={false}
+                                maxLength={32}
+                            />
+                            <small className="auth__hint">Регистрация по приглашению — код выдаёт владелец сервера</small>
+                        </label>
+                    )}
 
                     {isRegister && (
                         <label className="auth__field">

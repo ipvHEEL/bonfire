@@ -1,0 +1,7 @@
+# Вход в Bonfire из интернета. Caddy сам получает сертификат Let's Encrypt
+# на BONFIRE_DOMAIN и продлевает его, перенаправляет http на https и
+# передаёт запросы (включая вебсокеты) в nginx фронтенда
+{$BONFIRE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:80
+}

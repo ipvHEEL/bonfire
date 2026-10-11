@@ -1,0 +1,56 @@
+# Боевой сервер в интернете. Запуск — scripts/deploy.sh, или вручную:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Все секреты берутся из .env на сервере (создаёт scripts/server-init.sh)
+
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    environment:
+      BONFIRE_DOMAIN: ${BONFIRE_DOMAIN:?задайте BONFIRE_DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Здесь Caddy хранит сертификаты: без тома выпускал бы их заново
+      # при каждом перезапуске и упёрся бы в лимиты Let's Encrypt
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+  frontend:
+    # Наружу смотрит только Caddy
+    ports: !reset []
+    volumes: !override
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+
+  backend:
+    environment:
+      REGISTRATION_MODE: invite
+      COOKIE_SECURE: "true"
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?задайте LIVEKIT_API_KEY в .env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?задайте LIVEKIT_API_SECRET в .env}
+
+  livekit:
+    command:
+      - --config=/etc/livekit.yaml
+      # Публичный адрес сервера: на него собеседники отправляют звук
+      - --node-ip=${LIVEKIT_NODE_IP:?задайте LIVEKIT_NODE_IP в .env}
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    ports: !override
+      - "7881:7881"
+      - "7882:7882/udp"
+
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+    # База доступна только контейнерам, снаружи её не видно
+    ports: !reset []
+
+volumes:
+  caddy-data:
+  caddy-config:
