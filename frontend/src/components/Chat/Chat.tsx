@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, WS_URL, type Dialog, type Message, type ServerEvent, type User } from '../../api'
+import { api, WS_URL, type Call, type CallJoin, type Dialog, type Message, type ServerEvent, type User } from '../../api'
+import { CallPanel } from '../Call/CallPanel'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DialogMenu } from './DialogMenu'
 import { Highlight } from './Highlight'
@@ -30,6 +31,29 @@ function upsertDialog(dialogs: Dialog[], dialog: Dialog) {
 
 function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+// Что показать, когда звонок закончился. Зависит от того, кто звонил
+function callEndNotice(call: Call, userId: number) {
+    const outgoing = call.started_by === userId
+    switch (call.end_reason) {
+        case 'missed': return outgoing ? 'Не отвечает' : 'Пропущенный звонок'
+        case 'declined': return outgoing ? 'Звонок отклонён' : null
+        case 'cancelled': return outgoing ? null : 'Звонок отменён'
+        case 'interrupted': return 'Звонок прервался'
+        default: return 'Звонок завершён'
+    }
+}
+
+function PhoneIcon() {
+    return (
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+                fill="currentColor"
+                d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z"
+            />
+        </svg>
+    )
 }
 
 function RemoveUserIcon() {
@@ -70,6 +94,14 @@ export function Chat({ user, onLogout }: Props) {
     const [isAdding, setIsAdding] = useState(false)
     const [removing, setRemoving] = useState<Dialog | null>(null)
     const [requestError, setRequestError] = useState<string | null>(null)
+    // Текущий звонок. token === null — мы ещё не в разговоре (входящий вызов)
+    const [callState, setCallState] = useState<{ call: Call, token: string | null } | null>(null)
+    const [callNotice, setCallNotice] = useState<string | null>(null)
+    // Свежее значение для обработчиков вебсокета, которые создаются один раз
+    const callRef = useRef(callState)
+    useEffect(() => {
+        callRef.current = callState
+    }, [callState])
     const ws = useRef<WebSocket | null>(null)
     const messagesEnd = useRef<HTMLDivElement | null>(null)
 
@@ -99,8 +131,54 @@ export function Chat({ user, onLogout }: Props) {
         } else if (event.type === 'dialog_removed') {
             setDialogs((current) => current.filter((d) => d.dialog_id !== event.dialog_id))
             setActiveId((current) => (current === event.dialog_id ? null : current))
+            // Вместе с чатом удаляются и его звонки
+            setCallState((current) => (current?.call.dialog_id === event.dialog_id ? null : current))
+        } else if (event.type === 'call') {
+            const current = callRef.current
+            if (current && current.call.call_id !== event.call.call_id) {
+                // Мы уже разговариваем: новый входящий вызов отклоняем как «занято»
+                const incoming = event.call.status === 'ringing' && event.call.started_by !== user.user_id
+                if (incoming) api(`/calls/${event.call.call_id}/decline`, { method: 'POST' }).catch(console.error)
+                return
+            }
+            setCallState((prev) =>
+                prev?.call.call_id === event.call.call_id
+                    ? { ...prev, call: event.call }
+                    : prev ?? { call: event.call, token: null }
+            )
+        } else if (event.type === 'call_ended') {
+            if (callRef.current?.call.call_id !== event.call.call_id) return
+            setCallState(null)
+            setCallNotice(callEndNotice(event.call, user.user_id))
         }
-    }, [addMessages])
+    }, [addMessages, user.user_id])
+
+    // Если страницу открыли во время звонка, сразу показываем его
+    useEffect(() => {
+        api<{ calls: Call[] }>('/calls/active')
+            .then((data) => {
+                if (data.calls[0]) setCallState((prev) => prev ?? { call: data.calls[0], token: null })
+            })
+            .catch(console.error)
+    }, [])
+
+    // Закрыли вкладку посреди разговора — выходим из звонка, чтобы собеседник
+    // не ждал. sendBeacon успевает отправиться даже при закрытии страницы
+    useEffect(() => {
+        function handlePageHide() {
+            const current = callRef.current
+            if (current?.token) navigator.sendBeacon(`/api/calls/${current.call.call_id}/leave`)
+        }
+        window.addEventListener('pagehide', handlePageHide)
+        return () => window.removeEventListener('pagehide', handlePageHide)
+    }, [])
+
+    // Уведомление о конце звонка показываем несколько секунд
+    useEffect(() => {
+        if (!callNotice) return
+        const timer = setTimeout(() => setCallNotice(null), 4000)
+        return () => clearTimeout(timer)
+    }, [callNotice])
 
     useEffect(() => {
         api<{ dialogs: Dialog[] }>('/dialogs')
@@ -173,6 +251,42 @@ export function Chat({ user, onLogout }: Props) {
         await api(`/dialogs/${dialog.dialog_id}`, { method: 'DELETE' })
         handleEvent({ type: 'dialog_removed', dialog_id: dialog.dialog_id })
         setRemoving(null)
+    }
+
+    async function startCall(dialog: Dialog) {
+        if (callRef.current) return
+        try {
+            const join = await api<CallJoin>(`/dialogs/${dialog.dialog_id}/calls`, { method: 'POST' })
+            setCallState({ call: join.call, token: join.token })
+        } catch {
+            setCallNotice('Не удалось позвонить')
+        }
+    }
+
+    async function joinCall() {
+        const current = callRef.current
+        if (!current) return
+        try {
+            const join = await api<CallJoin>(`/calls/${current.call.call_id}/join`, { method: 'POST' })
+            setCallState({ call: join.call, token: join.token })
+        } catch {
+            setCallState(null)
+            setCallNotice('Звонок уже завершён')
+        }
+    }
+
+    async function declineCall() {
+        const current = callRef.current
+        if (!current) return
+        setCallState(null)
+        await api(`/calls/${current.call.call_id}/decline`, { method: 'POST' }).catch(console.error)
+    }
+
+    async function hangUp() {
+        const current = callRef.current
+        if (!current) return
+        setCallState(null)
+        await api(`/calls/${current.call.call_id}/leave`, { method: 'POST' }).catch(console.error)
     }
 
     async function handleLogout() {
@@ -359,6 +473,17 @@ export function Chat({ user, onLogout }: Props) {
                             {/* У входящего запроса для этого есть «Отклонить» */}
                             {!activeDialog.is_incoming_request && (
                                 <div className="chat__header-actions">
+                                    {activeDialog.status === 'accepted' && (
+                                        <button
+                                            className="chat__icon-btn"
+                                            onClick={() => startCall(activeDialog)}
+                                            disabled={callState !== null}
+                                            aria-label="Позвонить"
+                                            title={callState ? 'Вы уже в звонке' : 'Позвонить'}
+                                        >
+                                            <PhoneIcon />
+                                        </button>
+                                    )}
                                     <DialogMenu
                                         items={[{
                                             label: activeDialog.status === 'pending' ? 'Отменить запрос' : 'Удалить собеседника',
@@ -407,6 +532,30 @@ export function Chat({ user, onLogout }: Props) {
             </main>
 
             {isAdding && <NewChatDialog onCreated={handleCreated} onClose={() => setIsAdding(false)} />}
+
+            {callState && (
+                <CallPanel
+                    key={callState.call.call_id}
+                    call={callState.call}
+                    title={dialogs.find((d) => d.dialog_id === callState.call.dialog_id)?.title ?? 'Звонок'}
+                    token={callState.token}
+                    isIncoming={
+                        callState.token === null
+                        && callState.call.status === 'ringing'
+                        && callState.call.started_by !== user.user_id
+                    }
+                    onAccept={joinCall}
+                    onDecline={declineCall}
+                    onHangup={hangUp}
+                    onError={setCallNotice}
+                />
+            )}
+            {callNotice && (
+                // Под панелью звонка, если она открыта, иначе на её месте
+                <div className={'call-notice' + (callState ? ' call-notice--below' : '')} role="status">
+                    {callNotice}
+                </div>
+            )}
 
             {removing && (
                 <ConfirmDialog

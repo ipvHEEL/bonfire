@@ -1,20 +1,30 @@
 import json
 import os
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 from schema.connection_manager import manager
 from schema import events
 from auth.security import COOKIE_NAME, read_token
 from db.database import SessionLocal
+from db import calls as calls_db
 from db import dialogs as dialogs_db
 from db import messages as messages_db
 from db import users as users_db
-from routers import auth, dialogs
+from routers import auth, calls, dialogs
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Звонки, которые шли до перезапуска сервера, уже оборвались
+    async with SessionLocal() as session:
+        await calls_db.end_all_open_calls(session)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 
 app.add_middleware(
@@ -27,6 +37,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(dialogs.router)
+app.include_router(calls.router)
 
 
 def is_same_origin(websocket: WebSocket):

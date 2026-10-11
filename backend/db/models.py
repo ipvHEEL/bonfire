@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import Base
@@ -99,3 +99,42 @@ class Message(Base):
 
     user: Mapped[User] = relationship(back_populates="messages", lazy="joined")
     dialog: Mapped[Dialog] = relationship(back_populates="messages")
+
+
+class Call(Base):
+    __tablename__ = "calls"
+    # В чате не больше одного незавершённого звонка: если оба нажмут
+    # «позвонить» одновременно, второй присоединится к первому
+    __table_args__ = (
+        Index("uq_calls_open_per_dialog", "dialog_id", unique=True,
+              postgresql_where=text("ended_at IS NULL")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    dialog_id: Mapped[int] = mapped_column(ForeignKey("dialogs.id", ondelete="CASCADE"))
+    started_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # ringing — ещё не ответили, active — идёт разговор, ended — завершён
+    status: Mapped[str] = mapped_column(String(16), server_default="ringing")
+    # completed, cancelled, declined, missed — почему звонок закончился
+    end_reason: Mapped[str | None] = mapped_column(String(16))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CallParticipant(Base):
+    __tablename__ = "call_participants"
+
+    call_id: Mapped[int] = mapped_column(
+        ForeignKey("calls.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+

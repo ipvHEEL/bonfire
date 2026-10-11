@@ -651,6 +651,35 @@
 .chat__header-actions {
     margin-left: auto;
     align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chat__icon-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.chat__icon-btn:disabled:hover {
+    background: none;
+}
+
+/* Короткое уведомление о конце звонка */
+.call-notice {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 20;
+    padding: 12px 18px;
+    border-radius: 14px;
+    background-color: var(--surface);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    color: var(--text);
+}
+
+.call-notice--below {
+    top: 108px;
 }
 
 .menu {
