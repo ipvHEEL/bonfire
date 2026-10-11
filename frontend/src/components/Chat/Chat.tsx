@@ -25,9 +25,7 @@ function mergeMessages(current: Message[] = [], incoming: Message[]) {
 // Добавляет или заменяет чат и держит сверху чаты со свежими сообщениями
 function upsertDialog(dialogs: Dialog[], dialog: Dialog) {
     const rest = dialogs.filter((d) => d.dialog_id !== dialog.dialog_id)
-    return [dialog, ...rest].sort((a, b) =>
-        (b.last_message_at ?? '').localeCompare(a.last_message_at ?? '')
-    )
+    return [dialog, ...rest].sort((a, b) => b.activity_at.localeCompare(a.activity_at))
 }
 
 function formatTime(iso: string) {
@@ -93,6 +91,7 @@ export function Chat({ user, onLogout }: Props) {
                     ...dialog,
                     last_message: message.text,
                     last_message_at: message.created_at,
+                    activity_at: message.created_at,
                 })
             })
         } else if (event.type === 'dialog') {
@@ -198,6 +197,9 @@ export function Chat({ user, onLogout }: Props) {
 
     function renderItem(dialog: Dialog) {
         const isOutgoing = dialog.status === 'pending' && !dialog.is_incoming_request
+        let preview = dialog.last_message ?? 'Нет сообщений'
+        if (isOutgoing) preview = 'Ждёт ответа на запрос'
+        else if (dialog.is_incoming_request && !dialog.last_message) preview = 'Хочет начать переписку'
 
         return (
             <button
@@ -207,7 +209,7 @@ export function Chat({ user, onLogout }: Props) {
             >
                 <span className="chat__item-title"><Highlight text={dialog.title} query={query} /></span>
                 <span className="chat__item-preview">
-                    {isOutgoing ? 'Ждёт ответа на запрос' : dialog.last_message ?? 'Нет сообщений'}
+                    {preview}
                 </span>
             </button>
         )
@@ -370,7 +372,8 @@ export function Chat({ user, onLogout }: Props) {
                         </header>
 
                         <section className="chat__messages">
-                            {historyLoaded && messages.length === 0 && (
+                            {/* Пока запрос не принят, писать всё равно нельзя */}
+                            {historyLoaded && messages.length === 0 && activeDialog.status === 'accepted' && (
                                 <p className="chat__empty">Сообщений пока нет — напишите первым</p>
                             )}
                             {messages.map((message) => {

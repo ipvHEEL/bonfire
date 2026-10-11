@@ -142,12 +142,6 @@ export function NewChatDialog({ onCreated, onClose }: Props) {
             usernameRef.current?.focus()
             return
         }
-        if (!text.trim()) {
-            setError('Напишите сообщение к запросу')
-            textRef.current?.focus()
-            return
-        }
-
         setLoading(true)
         setError(null)
         try {
@@ -177,8 +171,8 @@ export function NewChatDialog({ onCreated, onClose }: Props) {
             <form className="new-chat__form" onSubmit={handleSubmit}>
                 <h3 id="new-chat-title">Новый собеседник</h3>
                 <p className="new-chat__note">
-                    Найдите человека по имени и отправьте запрос с одним сообщением.
-                    Продолжить переписку можно будет, когда он его примет.
+                    Найдите человека по имени и отправьте запрос. К нему можно приложить
+                    одно сообщение, а продолжить переписку получится, когда запрос примут.
                 </p>
 
                 <div className="new-chat__field">
@@ -245,7 +239,7 @@ export function NewChatDialog({ onCreated, onClose }: Props) {
                 </div>
 
                 <label className="new-chat__field">
-                    <span>Сообщение</span>
+                    <span>Сообщение <em>(необязательно)</em></span>
                     <textarea
                         ref={textRef}
                         className="new-chat__input new-chat__textarea"
