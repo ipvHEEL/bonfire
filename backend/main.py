@@ -2,7 +2,8 @@ import json
 import os
 from urllib.parse import urlparse
 
-from schema.connection_manager import ConnectionManager
+from schema.connection_manager import manager
+from schema import events
 from auth.security import COOKIE_NAME, read_token
 from db.database import SessionLocal
 from db import dialogs as dialogs_db
@@ -26,8 +27,6 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(dialogs.router)
-
-manager = ConnectionManager()
 
 
 def is_same_origin(websocket: WebSocket):
@@ -65,12 +64,15 @@ async def websocket_start(websocket: WebSocket):
                 continue
 
             async with SessionLocal() as session:
-                member_ids = await dialogs_db.get_member_ids(session, dialog_id)
-                if user.id not in member_ids:
+                dialog = await dialogs_db.get_dialog(session, dialog_id)
+                member_ids = {m.id for m in dialog.members} if dialog else set()
+                # Пока запрос не принят, писать нельзя: первое сообщение
+                # уже ушло вместе с запросом
+                if user.id not in member_ids or dialog.status != "accepted":
                     continue
                 message = await messages_db.create_message(session, dialog_id, user.id, text)
 
-            await manager.send_to_users(member_ids, messages_db.message_to_dict(message))
+            await events.send_message(member_ids, message)
     except WebSocketDisconnect:
         manager.disconnect(user.id, websocket)
 

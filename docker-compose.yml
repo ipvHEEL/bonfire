@@ -1,6 +1,9 @@
 services:
   db:
     image: postgres:17-alpine
+    # База на SSD: случайное чтение почти не дороже последовательного.
+    # Без этого Postgres недооценивает индексы, например триграммный поиск
+    command: ["postgres", "-c", "random_page_cost=1.1"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bonfire}
       POSTGRES_USER: ${POSTGRES_USER:-bonfire}

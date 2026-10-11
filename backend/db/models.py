@@ -8,6 +8,14 @@ from db.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    # Триграммные индексы ускоряют поиск по подстроке (ILIKE '%…%'):
+    # без них Postgres перебирал бы всю таблицу на каждый введённый символ
+    __table_args__ = (
+        Index("ix_users_username_trgm", "username",
+              postgresql_using="gin", postgresql_ops={"username": "gin_trgm_ops"}),
+        Index("ix_users_display_name_trgm", "display_name",
+              postgresql_using="gin", postgresql_ops={"display_name": "gin_trgm_ops"}),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     username: Mapped[str] = mapped_column(String(32), unique=True)
@@ -34,8 +42,14 @@ class Dialog(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     title: Mapped[str] = mapped_column(String(128))
-    # "group" — общий чат, "direct" — личная переписка двух пользователей
+    # "group" — групповой чат, "direct" — личная переписка двух пользователей
     type: Mapped[str] = mapped_column(String(16), server_default="group")
+    # "pending" — запрос на переписку ещё не принят, "accepted" — можно писать
+    status: Mapped[str] = mapped_column(String(16), server_default="accepted")
+    # Кто создал чат; у запроса это отправитель
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_dialogs_created_by_users")
+    )
     # Для личных чатов "меньший_id:больший_id". Уникальность не даёт создать
     # два чата одной пары, даже если оба откроют переписку одновременно
     direct_key: Mapped[str | None] = mapped_column(String(41))

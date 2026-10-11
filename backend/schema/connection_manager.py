@@ -26,3 +26,7 @@ class ConnectionManager:
                     await websocket.send_json(message)
                 except Exception:
                     self.disconnect(user_id, websocket)
+
+
+# Один на всё приложение: им пользуются и вебсокет, и HTTP-эндпоинты
+manager = ConnectionManager()

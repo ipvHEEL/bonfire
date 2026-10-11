@@ -20,6 +20,92 @@
     margin: 0;
 }
 
+/* Заголовок панели: поиск и добавление собеседника */
+
+.chat__sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.chat__tools {
+    display: flex;
+    gap: 4px;
+}
+
+.chat__icon-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.chat__icon-btn:hover {
+    background-color: var(--surface);
+}
+
+.chat__icon-btn--active,
+.chat__icon-btn--active:hover {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.chat__icon-btn:focus-visible,
+.chat__search:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.chat__search {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    background-color: var(--surface);
+    color: var(--text);
+    outline: none;
+}
+
+.chat__search::placeholder {
+    color: var(--text-muted);
+}
+
+.chat__badge {
+    display: inline-block;
+    min-width: 18px;
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background-color: var(--accent);
+    color: var(--on-accent);
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    letter-spacing: 0;
+}
+
+.chat__match {
+    padding: 0 1px;
+    border-radius: 3px;
+    background-color: rgba(162, 119, 249, 0.35);
+    color: inherit;
+}
+
+.chat__section-empty {
+    margin: 0;
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
 .chat__section {
     display: flex;
     flex-direction: column;
@@ -37,17 +123,37 @@
 
 .chat__item {
     width: 100%;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border: none;
     border-radius: 10px;
     background: none;
     color: var(--text);
     text-align: left;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.2s;
+}
+
+.chat__item-title,
+.chat__item-preview {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    transition: background-color 0.2s;
+}
+
+.chat__item-title {
+    font-weight: 500;
+}
+
+.chat__item-preview {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.chat__item--active .chat__item-preview {
+    color: var(--on-accent);
+    opacity: 0.8;
 }
 
 .chat__item:hover {
@@ -248,5 +354,371 @@
 .btn-send:disabled {
     background-color: var(--surface);
     color: var(--text-muted);
+    cursor: default;
+}
+
+/* Нет выбранного чата */
+
+.chat__placeholder {
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+}
+
+.chat__placeholder p {
+    margin: 0;
+}
+
+/* Запрос на переписку вместо поля ввода */
+
+.chat__request {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.chat__request p {
+    margin: 0;
+}
+
+.chat__request strong {
+    color: var(--text);
+}
+
+.chat__request-error {
+    color: var(--danger);
+}
+
+.chat__request-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.chat__accept,
+.chat__decline {
+    padding: 10px 20px;
+    border-radius: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.chat__accept {
+    border: none;
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.chat__accept:hover {
+    background-color: var(--accent-hover);
+}
+
+.chat__decline {
+    border: 1px solid var(--surface);
+    background: none;
+    color: var(--text-muted);
+}
+
+.chat__decline:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.chat__accept:focus-visible,
+.chat__decline:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Окно «Новый собеседник» */
+
+.new-chat {
+    width: min(420px, calc(100% - 32px));
+    /* Крепим к верху, а не по центру: иначе при любом изменении высоты
+       (подсказки, ошибка) всё окно сдвигается вверх-вниз */
+    margin: 12vh auto auto;
+    /* Выпадающий список может выходить за нижний край формы */
+    overflow: visible;
+    padding: 0;
+    border: none;
+    border-radius: 20px;
+    background-color: var(--surface);
+    color: var(--text);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.new-chat::backdrop {
+    background-color: rgba(10, 9, 16, 0.6);
+}
+
+.new-chat__form {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.new-chat__form h3 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.new-chat__note {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.new-chat__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.new-chat__input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    background-color: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.new-chat__input::placeholder {
+    color: var(--text-muted);
+}
+
+.new-chat__input:focus {
+    border-color: var(--accent);
+}
+
+.new-chat__textarea {
+    border-radius: 16px;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.new-chat__error {
+    min-height: 20px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--danger);
+}
+
+.new-chat__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.new-chat__cancel,
+.new-chat__submit {
+    padding: 10px 18px;
+    border-radius: 22px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.new-chat__cancel {
+    border: none;
+    background: none;
+    color: var(--text-muted);
+}
+
+.new-chat__cancel:hover {
+    color: var(--text);
+}
+
+.new-chat__submit {
+    border: none;
+    background-color: var(--accent);
+    color: var(--on-accent);
+    transition: background-color 0.2s;
+}
+
+.new-chat__submit:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+}
+
+.new-chat__submit:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.new-chat__cancel:focus-visible,
+.new-chat__submit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Поиск собеседника в окне «Новый собеседник» */
+
+.new-chat__combobox {
+    position: relative;
+}
+
+.new-chat__selected {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* Список поверх формы: его появление не меняет высоту окна */
+.new-chat__suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid var(--surface);
+    border-radius: 14px;
+    background-color: var(--bg);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    max-height: 236px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface) transparent;
+}
+
+.new-chat__suggestions-title {
+    padding: 6px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.new-chat__option {
+    padding: 6px 12px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.new-chat__option--active {
+    background-color: var(--surface);
+}
+
+.new-chat__option-name {
+    font-weight: 500;
+}
+
+.new-chat__option-username {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.new-chat__hint {
+    min-height: 18px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.new-chat__hint strong {
+    color: var(--text);
+}
+
+/* Меню «⋯» в шапке чата */
+
+.chat__header-actions {
+    margin-left: auto;
+    align-self: center;
+}
+
+.menu {
+    position: relative;
+}
+
+.menu__list {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 10;
+    min-width: 220px;
+    padding: 4px;
+    border: 1px solid var(--surface);
+    border-radius: 14px;
+    background-color: var(--bg);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+}
+
+.menu__item {
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.menu__item:hover,
+.menu__item:focus-visible {
+    background-color: var(--surface);
+    outline: none;
+}
+
+.menu__item--danger {
+    color: var(--danger);
+}
+
+.confirm__danger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.confirm .new-chat__note p {
+    margin: 0;
+}
+
+.confirm .new-chat__note strong {
+    color: var(--text);
+}
+
+.confirm__danger {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 22px;
+    background-color: var(--danger);
+    color: var(--bg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.confirm__danger:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.confirm__danger:disabled {
+    opacity: 0.6;
     cursor: default;
 }
