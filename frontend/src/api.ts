@@ -17,6 +17,8 @@ export type Dialog = {
     peer_user_id: number | null
     last_message: string | null
     last_message_at: string | null
+    // Время последней активности: по нему сортируется список чатов
+    activity_at: string
 }
 
 export type Message = {

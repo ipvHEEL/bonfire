@@ -18,7 +18,8 @@ router = APIRouter(tags=["dialogs"])
 
 class RequestIn(BaseModel):
     username: str = Field(min_length=1, max_length=32)
-    text: str = Field(min_length=1, max_length=messages_db.MAX_TEXT_LENGTH)
+    # Сообщение к запросу необязательно
+    text: str = Field(default="", max_length=messages_db.MAX_TEXT_LENGTH)
 
 
 async def get_member_dialog(session: AsyncSession, dialog_id: int, user: User):
@@ -75,7 +76,7 @@ async def get_dialogs(user: User = Depends(get_current_user), session: AsyncSess
     last = await dialogs_db.get_last_messages(session, [d.id for d in dialogs])
     result = [dialogs_db.dialog_to_dict(d, user, last.get(d.id)) for d in dialogs]
     # Сверху чаты со свежими сообщениями
-    result.sort(key=lambda d: d["last_message_at"] or "", reverse=True)
+    result.sort(key=lambda d: d["activity_at"], reverse=True)
     return {"dialogs": result}
 
 
@@ -86,8 +87,6 @@ async def create_request(
     session: AsyncSession = Depends(get_session),
 ):
     text = data.text.strip()
-    if not text:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Напишите сообщение к запросу")
 
     other = await users_db.get_user_by_username(session, data.username.strip().lstrip("@"))
     if other is None or other.password_hash is None or other.id == user.id:
@@ -105,7 +104,8 @@ async def create_request(
         raise HTTPException(status.HTTP_409_CONFLICT, "Этот пользователь уже прислал вам запрос — загляните в «Запросы»")
 
     await events.send_dialog(dialog, message)
-    await events.send_message({user.id, other.id}, message)
+    if message is not None:
+        await events.send_message({user.id, other.id}, message)
     return dialogs_db.dialog_to_dict(dialog, user, message)
 
 

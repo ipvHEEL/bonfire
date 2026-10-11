@@ -485,6 +485,12 @@
     font-weight: 500;
 }
 
+.new-chat__field em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
 .new-chat__input {
     width: 100%;
     padding: 12px 16px;

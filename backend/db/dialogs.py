@@ -26,6 +26,8 @@ def dialog_to_dict(dialog: Dialog, current_user: User, last_message: Message | N
         "peer_user_id": peer_user_id,
         "last_message": last_message.text if last_message else None,
         "last_message_at": last_message.created_at.isoformat() if last_message else None,
+        # По этому полю чаты сортируются: у запроса без сообщения это время создания
+        "activity_at": (last_message.created_at if last_message else dialog.created_at).isoformat(),
     }
 
 
@@ -85,9 +87,10 @@ async def get_direct(session: AsyncSession, user: User, other: User):
 
 
 async def create_request(session: AsyncSession, user: User, other: User, text: str):
-    """Создаёт запрос на переписку вместе с первым сообщением.
+    """Создаёт запрос на переписку и, если текст не пустой, первое сообщение.
 
-    Возвращает (dialog, message), или (None, None), если чат этой пары уже есть.
+    Возвращает (dialog, message): message будет None, если писать не стали.
+    (None, None) — если чат этой пары уже есть.
     """
     # ON CONFLICT по direct_key: если чат этой пары уже существует
     # или его прямо сейчас создаёт другой запрос, ничего не вставится
@@ -110,10 +113,13 @@ async def create_request(session: AsyncSession, user: User, other: User, text: s
         DialogMember(dialog_id=dialog_id, user_id=user.id),
         DialogMember(dialog_id=dialog_id, user_id=other.id),
     ])
-    message = Message(dialog_id=dialog_id, user_id=user.id, text=text)
-    session.add(message)
+    message = None
+    if text:
+        message = Message(dialog_id=dialog_id, user_id=user.id, text=text)
+        session.add(message)
     await session.commit()
-    await session.refresh(message)
+    if message is not None:
+        await session.refresh(message)
 
     return await get_dialog(session, dialog_id), message
 
