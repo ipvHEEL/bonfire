@@ -47,7 +47,7 @@ export function Chat() {
         <div className="chat">
 
             <aside className="chat__sidebar">
-                <h2>chats</h2>
+                <h2>Bonfire</h2>
 
                 <div className="chat__user">
                     {users.map((user) => (
@@ -67,11 +67,21 @@ export function Chat() {
 
                 
                 <section className="chat__messages">
-                    {messages.map((message) => (
-                        <div key={message.message_id}>
-                            {message.user_name}: {message.text}
-                        </div>
-                    ))}
+                    {messages.map((message) => {
+                        const isOwn = message.user_name === userName
+
+                        return (
+                            <div
+                                key={message.message_id}
+                                className={'message' + (isOwn ? ' message--own' : '')}
+                            >
+                                {!isOwn && (
+                                    <span className="message__author">{message.user_name}</span>
+                                )}
+                                <span className="message__text">{message.text}</span>
+                            </div>
+                        )
+                    })}
                 </section>
 
 
@@ -84,9 +94,20 @@ export function Chat() {
                         onChange={(e) => setText(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSend()}
                     />
-                        <button className='btn' onClick={handleSend}>
-                            Отправить
-                        </button>
+                    <button
+                        className="btn-send"
+                        onClick={handleSend}
+                        disabled={!text.trim()}
+                        aria-label="Отправить"
+                        title="Отправить"
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                            <path
+                                d="M3.4 20.4 21 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"
+                                fill="currentColor"
+                            />
+                        </svg>
+                    </button>
                 </footer>
 
             </main>
