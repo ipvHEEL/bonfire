@@ -30,11 +30,31 @@ export type Message = {
     created_at: string
 }
 
+export type Call = {
+    call_id: number
+    dialog_id: number
+    // ringing — ещё не ответили, active — идёт разговор
+    status: 'ringing' | 'active' | 'ended'
+    started_by: number | null
+    end_reason: 'completed' | 'cancelled' | 'declined' | 'missed' | 'interrupted' | null
+    started_at: string
+    answered_at: string | null
+}
+
+// Ответ на «позвонить» и «ответить»: звонок и пропуск в комнату LiveKit
+export type CallJoin = {
+    call: Call
+    room: string
+    token: string
+}
+
 // События, которые сервер присылает по вебсокету
 export type ServerEvent =
     | { type: 'message', message: Message }
     | { type: 'dialog', dialog: Dialog }
     | { type: 'dialog_removed', dialog_id: number }
+    | { type: 'call', call: Call }
+    | { type: 'call_ended', call: Call }
 
 export class ApiError extends Error {
     status: number
@@ -65,4 +85,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     return body as T
 }
 
-export const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+const WS_PROTOCOL = location.protocol === 'https:' ? 'wss' : 'ws'
+export const WS_URL = `${WS_PROTOCOL}://${location.host}/ws`
+// Сигнальное соединение LiveKit идёт через тот же адрес, nginx передаёт его дальше
+export const LIVEKIT_URL = `${WS_PROTOCOL}://${location.host}/livekit`

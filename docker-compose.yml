@@ -24,7 +24,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bonfire}:${POSTGRES_PASSWORD:-bonfire}@db:5432/${POSTGRES_DB:-bonfire}
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-in-the-env-file}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Сайт открывается только по https (см. frontend/nginx.conf)
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-dev-only-livekit-secret-change-me-in-env}
     depends_on:
       db:
         condition: service_healthy
@@ -33,9 +36,35 @@ services:
   frontend:
     build: ./frontend
     ports:
+      # 8080 только перенаправляет на https
       - "8080:80"
+      - "8443:443"
+    volumes:
+      # Выпускаются скриптом scripts/make-certs.sh
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - backend
+      - livekit
+    restart: unless-stopped
+
+  # Медиасервер (SFU) для звонков: каждый участник отправляет свой звук
+  # один раз, а сервер раздаёт его остальным — так работают и группы
+  livekit:
+    image: livekit/livekit-server:v1.13.7
+    command:
+      - --config=/etc/livekit.yaml
+      # Адрес компьютера в локальной сети: по нему устройства присылают звук
+      - --node-ip=${LIVEKIT_NODE_IP:-127.0.0.1}
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-dev-only-livekit-secret-change-me-in-env}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      # Сигнальный порт: в Docker он идёт через nginx (/livekit/), а наружу
+      # открыт только для этого компьютера — для npm run dev
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
     restart: unless-stopped
 
 volumes:
