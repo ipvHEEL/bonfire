@@ -1,0 +1,177 @@
+.auth {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+.auth__card {
+    width: 100%;
+    max-width: 380px;
+    padding: 32px 28px;
+    border-radius: 20px;
+    background-color: var(--surface);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.auth__brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    color: var(--accent);
+}
+
+.auth__brand h1 {
+    margin: 0;
+    font-size: 28px;
+    color: var(--text);
+}
+
+/* Переключатель Вход / Регистрация */
+
+.auth__tabs {
+    display: flex;
+    padding: 4px;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    background-color: var(--bg);
+}
+
+.auth__tab {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--text-muted);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.auth__tab:hover {
+    color: var(--text);
+}
+
+.auth__tab--active {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.auth__tab--active:hover {
+    color: var(--on-accent);
+}
+
+.auth__tab:focus-visible,
+.auth__toggle:focus-visible,
+.auth__submit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Поля */
+
+.auth__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.auth__field em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.auth__input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    background-color: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.auth__input:focus {
+    border-color: var(--accent);
+}
+
+.auth__hint {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.auth__password {
+    position: relative;
+}
+
+.auth__password .auth__input {
+    padding-right: 90px;
+}
+
+.auth__toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    padding: 4px 10px;
+    border: none;
+    border-radius: 14px;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.auth__toggle:hover {
+    background-color: var(--surface);
+}
+
+/* Ошибка и кнопка */
+
+.auth__error {
+    min-height: 20px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--danger);
+}
+
+.auth__submit {
+    padding: 12px;
+    border: none;
+    border-radius: 22px;
+    background-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.auth__submit:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+}
+
+.auth__submit:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.auth__submit:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
