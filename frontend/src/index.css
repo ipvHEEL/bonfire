@@ -1,4 +1,27 @@
+* {
+    box-sizing: border-box;
+}
+
+html, body, #root {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+:root {
+    --bg: #21202e;
+    --surface: #2e2b38;
+    --border: #1c1b22;
+    --text: #81e1f2;
+    --text-muted: #8a87a0;
+    --accent: #a277f9;
+    --accent-hover: #b48ffa;
+    --on-accent: #ffffff;
+    --danger: #ff7a90;
+}
+
 body {
+    background-color: var(--bg);
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 1.5;

@@ -1,10 +1,15 @@
 import json
 import os
+from urllib.parse import urlparse
 
 from schema.connection_manager import ConnectionManager
+from auth.security import COOKIE_NAME, read_token
 from db.database import SessionLocal
+from db import dialogs as dialogs_db
 from db import messages as messages_db
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from db import users as users_db
+from routers import auth, dialogs
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -14,41 +19,36 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(dialogs.router)
+
 manager = ConnectionManager()
 
-@app.get("/user")
-async def get_users():
-    async with SessionLocal() as session:
-        users = await messages_db.get_users(session)
 
-    return {
-        "users": [
-            {
-                "user_id": str(user.id),
-                "user_name": user.username
-            }
-            for user in users
-        ]
-    }
+def is_same_origin(websocket: WebSocket):
+    # Браузер сам прикладывает cookie к вебсокету с любого сайта,
+    # поэтому пускаем только страницы с нашего же адреса
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host")
+    return origin is not None and urlparse(origin).netloc == host
 
-@app.get("/dialogs/{dialog_id}/messages")
-async def get_messages(
-    dialog_id: int,
-    limit: int = Query(50, ge=1, le=200),
-    before_id: int | None = None,
-):
-    async with SessionLocal() as session:
-        messages = await messages_db.get_messages(session, dialog_id, limit, before_id)
-
-    return {"messages": [messages_db.message_to_dict(m) for m in messages]}
 
 @app.websocket('/ws')
 async def websocket_start(websocket: WebSocket):
-    await manager.connect(websocket)
+    async with SessionLocal() as session:
+        user_id = read_token(websocket.cookies.get(COOKIE_NAME))
+        user = await users_db.get_user(session, user_id) if user_id else None
+
+    if user is None or user.password_hash is None or not is_same_origin(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await manager.connect(user.id, websocket)
 
     try:
         while True:
@@ -60,19 +60,19 @@ async def websocket_start(websocket: WebSocket):
                 continue
 
             text = str(data.get("text", "")).strip()
-            user_name = str(data.get("user_name", "")).strip() or "anonymous"
-            dialog_id = data.get("dialog_id", 1)
+            dialog_id = data.get("dialog_id")
             if not text or not isinstance(dialog_id, int):
                 continue
 
             async with SessionLocal() as session:
-                message = await messages_db.create_message(session, dialog_id, user_name, text)
-            if message is None:
-                continue
+                member_ids = await dialogs_db.get_member_ids(session, dialog_id)
+                if user.id not in member_ids:
+                    continue
+                message = await messages_db.create_message(session, dialog_id, user.id, text)
 
-            await manager.broadcast(messages_db.message_to_dict(message))
+            await manager.send_to_users(member_ids, messages_db.message_to_dict(message))
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(user.id, websocket)
 
 
 if __name__ == "__main__":
