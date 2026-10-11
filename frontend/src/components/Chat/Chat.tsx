@@ -40,6 +40,9 @@ export function Chat() {
         setText('')
     }
 
+    const users = [...new Set(messages.map((message) => message.user_name))]
+        .filter((user) => user !== userName)
+
     return (
         <div className="chat">
 
@@ -47,9 +50,9 @@ export function Chat() {
                 <h2>chats</h2>
 
                 <div className="chat__user">
-                    {messages.map((message) => (
-                        <div key={message.message_id}>
-                            {message.user_name}
+                    {users.map((user) => (
+                        <div key={user}>
+                            {user}
                         </div>
                     ))}
                 </div>
