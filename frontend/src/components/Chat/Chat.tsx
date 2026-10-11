@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, WS_URL, type Call, type CallJoin, type Dialog, type Message, type ServerEvent, type User } from '../../api'
 import { CallPanel } from '../Call/CallPanel'
+import { isAppVisible, notify, requestPermissionOnFirstInteraction } from '../../notifications'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DialogMenu } from './DialogMenu'
 import { Highlight } from './Highlight'
@@ -104,6 +105,15 @@ export function Chat({ user, onLogout }: Props) {
     }, [callState])
     const ws = useRef<WebSocket | null>(null)
     const messagesEnd = useRef<HTMLDivElement | null>(null)
+    // Для уведомлений: какой чат открыт и как называются чаты
+    const activeIdRef = useRef(activeId)
+    const dialogsRef = useRef(dialogs)
+    useEffect(() => {
+        activeIdRef.current = activeId
+        dialogsRef.current = dialogs
+    }, [activeId, dialogs])
+
+    useEffect(() => requestPermissionOnFirstInteraction(), [])
 
     const addMessages = useCallback((dialogId: number, incoming: Message[]) => {
         setMessagesByDialog((prev) => ({
@@ -116,6 +126,16 @@ export function Chat({ user, onLogout }: Props) {
         if (event.type === 'message') {
             const { message } = event
             addMessages(message.dialog_id, [message])
+            // Не уведомляем о своих сообщениях и о чате, который сейчас перед глазами
+            const watching = isAppVisible() && activeIdRef.current === message.dialog_id
+            if (message.user_id !== user.user_id && !watching) {
+                notify({
+                    title: message.user_name,
+                    body: message.text,
+                    tag: `dialog-${message.dialog_id}`,
+                    onClick: () => setActiveId(message.dialog_id),
+                })
+            }
             setDialogs((current) => {
                 const dialog = current.find((d) => d.dialog_id === message.dialog_id)
                 if (!dialog) return current
@@ -127,7 +147,17 @@ export function Chat({ user, onLogout }: Props) {
                 })
             })
         } else if (event.type === 'dialog') {
-            setDialogs((current) => upsertDialog(current, event.dialog))
+            const { dialog } = event
+            const isNew = !dialogsRef.current.some((d) => d.dialog_id === dialog.dialog_id)
+            if (isNew && dialog.is_incoming_request && !isAppVisible()) {
+                notify({
+                    title: `${dialog.title} хочет начать переписку`,
+                    body: dialog.last_message ?? 'Новый запрос в Bonfire',
+                    tag: `dialog-${dialog.dialog_id}`,
+                    onClick: () => setActiveId(dialog.dialog_id),
+                })
+            }
+            setDialogs((current) => upsertDialog(current, dialog))
         } else if (event.type === 'dialog_removed') {
             setDialogs((current) => current.filter((d) => d.dialog_id !== event.dialog_id))
             setActiveId((current) => (current === event.dialog_id ? null : current))
@@ -140,6 +170,15 @@ export function Chat({ user, onLogout }: Props) {
                 const incoming = event.call.status === 'ringing' && event.call.started_by !== user.user_id
                 if (incoming) api(`/calls/${event.call.call_id}/decline`, { method: 'POST' }).catch(console.error)
                 return
+            }
+            const incomingRing = !current && event.call.status === 'ringing' && event.call.started_by !== user.user_id
+            if (incomingRing && !isAppVisible()) {
+                const caller = dialogsRef.current.find((d) => d.dialog_id === event.call.dialog_id)?.title
+                notify({
+                    title: 'Входящий звонок',
+                    body: caller ? `Звонит ${caller}` : 'Вам звонят в Bonfire',
+                    tag: `call-${event.call.call_id}`,
+                })
             }
             setCallState((prev) =>
                 prev?.call.call_id === event.call.call_id
