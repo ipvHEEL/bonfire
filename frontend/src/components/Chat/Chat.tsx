@@ -8,7 +8,7 @@ type Message = {
     user_name: string
 }
 
-const WS_URL = "ws://localhost:8000/ws"
+const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
 
 export function Chat() {
     const [messages, setMessages] = useState<Message[]>([])
