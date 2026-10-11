@@ -1,4 +1,5 @@
 import json
+import os
 
 from schema.connection_manager import ConnectionManager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -6,11 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
-URL = "http://localhost:5173"
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[URL],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
